@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Circle Runner</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="homeScreen" class="screen">
+  <h1>Circle Runner</h1>
+  <button id="playBtn">Play</button>
+  <button id="shopBtn">Shop</button>
+  <button id="settingsBtn">Settings</button>
+</div>
+
+<div id="shopScreen" class="screen hidden">
+  <h2>Shop</h2>
+  <div class="themeOption" data-theme="theme1">Light Blue & Black</div>
+  <div class="themeOption" data-theme="theme2">Light Green & Black</div>
+  <div class="themeOption" data-theme="theme3">Black & White</div>
+  <button id="backShop">Back</button>
+</div>
+
+<div id="gameScreen" class="screen hidden">
+  <canvas id="gameCanvas" width="600" height="400"></canvas>
+  <button id="backHome">Back</button>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>
