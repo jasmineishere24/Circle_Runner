@@ -1,37 +1,50 @@
-// --- Screen Management ---
+// --- Screens ---
 const homeScreen = document.getElementById('homeScreen');
+const levelScreen = document.getElementById('levelScreen');
 const shopScreen = document.getElementById('shopScreen');
+const settingsScreen = document.getElementById('settingsScreen');
 const gameScreen = document.getElementById('gameScreen');
 
-document.getElementById('playBtn').onclick = () => { showScreen(gameScreen); startGame(); };
+const pointsDisplay = document.getElementById('pointsDisplay');
+const gamePointsDisplay = document.getElementById('gamePoints');
+
+document.getElementById('playBtn').onclick = () => showScreen(levelScreen);
 document.getElementById('shopBtn').onclick = () => showScreen(shopScreen);
+document.getElementById('settingsBtn').onclick = () => showScreen(settingsScreen);
+document.getElementById('backHomeFromLevel').onclick = () => showScreen(homeScreen);
 document.getElementById('backShop').onclick = () => showScreen(homeScreen);
-document.getElementById('backHome').onclick = () => { showScreen(homeScreen); resetGame(); };
+document.getElementById('backSettings').onclick = () => showScreen(homeScreen);
+document.getElementById('backHomeFromGame').onclick = () => { showScreen(homeScreen); resetGame(); };
 
 function showScreen(screen){
-  [homeScreen, shopScreen, gameScreen].forEach(s => s.classList.add('hidden'));
+  [homeScreen, levelScreen, shopScreen, settingsScreen, gameScreen].forEach(s => s.classList.add('hidden'));
   screen.classList.remove('hidden');
 }
 
-// --- Canvas & Player ---
+// --- Game Variables ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
-const player = { x: 50, y: 200, r: 15, speed: 4 };
+const player = { x:50, y:200, r:15, speed:4 };
 let keys = {};
-let touchY = null;
+let touchActive = false;
 
 window.addEventListener('keydown', e => keys[e.key] = true);
 window.addEventListener('keyup', e => keys[e.key] = false);
-canvas.addEventListener('touchstart', e => { touchY = e.touches[0].clientY; });
-canvas.addEventListener('touchmove', e => {
-  const touch = e.touches[0];
-  const deltaY = touch.clientY - touchY;
-  player.y += deltaY * 0.5;
-  touchY = touch.clientY;
-});
 
-// --- Levels (12 levels example) ---
+canvas.addEventListener('touchstart', e => { touchActive = true; movePlayerTouch(e); e.preventDefault(); });
+canvas.addEventListener('touchmove', movePlayerTouch);
+canvas.addEventListener('touchend', e => { touchActive = false; });
+
+function movePlayerTouch(e){
+  if(!touchActive) return;
+  const rect = canvas.getBoundingClientRect();
+  const touch = e.touches[0];
+  player.x = touch.clientX - rect.left;
+  player.y = touch.clientY - rect.top;
+}
+
+// --- Levels ---
 const levels = [
   [{x:150,y:0,w:20,h:150,dx:0,dy:2},{x:300,y:250,w:20,h:150,dx:0,dy:2}],
   [{x:100,y:50,w:150,h:20,dx:3,dy:0},{x:300,y:0,w:20,h:200,dx:0,dy:2}],
@@ -50,33 +63,100 @@ const levels = [
 let currentLevel = 0;
 let obstacles = [];
 
+// --- Points / Currency ---
+let points = parseInt(localStorage.getItem('points')) || 0;
+let unlockedLevels = JSON.parse(localStorage.getItem('unlockedLevels')) || [1];
+let purchasedThemes = JSON.parse(localStorage.getItem('purchasedThemes')) || ['theme1'];
+
 // --- Themes ---
 const themes = {
-  theme1: { bg:'#a0d8f1', player:'#ff3b3b', obstacles:'#2b2b2b' },
-  theme2: { bg:'#b6f2a0', player:'#ff3b3b', obstacles:'#2b2b2b' },
-  theme3: { bg:'#000', player:'#fff', obstacles:'#fff' }
+  theme1: { name:'Light Blue & Black', cost:0, bg:'#a0d8f1', player:'#ff3b3b', obstacles:'#2b2b2b' },
+  theme2: { name:'Light Green & Black', cost:50, bg:'#b6f2a0', player:'#ff3b3b', obstacles:'#2b2b2b' },
+  theme3: { name:'Black & White', cost:100, bg:'#000', player:'#fff', obstacles:'#fff' }
 };
 
-let currentTheme = themes.theme1;
+let currentTheme = themes[purchasedThemes[0]];
 
-// --- Shop click ---
-document.querySelectorAll('.themeOption').forEach(btn=>{
-  btn.onclick = () => currentTheme = themes[btn.dataset.theme];
-});
+// --- Level Buttons ---
+const levelButtonsDiv = document.getElementById('levelButtons');
+function createLevelButtons(){
+  levelButtonsDiv.innerHTML='';
+  for(let i=0;i<levels.length;i++){
+    const btn = document.createElement('button');
+    btn.textContent = `Level ${i+1}`;
+    if(!unlockedLevels.includes(i+1)) btn.disabled=true;
+    btn.onclick = () => { currentLevel=i; showScreen(gameScreen); startGame(); };
+    levelButtonsDiv.appendChild(btn);
+  }
+}
+createLevelButtons();
 
-// --- Game Logic ---
+// --- Shop Buttons ---
+const shopThemesDiv = document.getElementById('shopThemes');
+function createShop(){
+  shopThemesDiv.innerHTML='';
+  for(let key in themes){
+    const theme = themes[key];
+    const btn = document.createElement('div');
+    btn.classList.add('themeOption');
+    btn.textContent = `${theme.name} (${theme.cost} pts)`;
+    if(purchasedThemes.includes(key)) btn.textContent += ' ✅';
+    btn.onclick = () => buyTheme(key);
+    shopThemesDiv.appendChild(btn);
+  }
+}
+createShop();
+
+function buyTheme(key){
+  const theme = themes[key];
+  if(purchasedThemes.includes(key)){ currentTheme = theme; return; }
+  if(points >= theme.cost){
+    points -= theme.cost;
+    purchasedThemes.push(key);
+    currentTheme = theme;
+    updatePoints();
+    saveData();
+    createShop();
+  } else { alert('Not enough points!'); }
+}
+
+// --- Settings Buttons ---
+const settingsThemesDiv = document.getElementById('settingsThemes');
+function createSettings(){
+  settingsThemesDiv.innerHTML='';
+  for(let key of purchasedThemes){
+    const theme = themes[key];
+    const btn = document.createElement('div');
+    btn.classList.add('themeOption');
+    btn.textContent = theme.name;
+    btn.onclick = () => { currentTheme=theme; saveData(); };
+    settingsThemesDiv.appendChild(btn);
+  }
+}
+createSettings();
+
+// --- Save Data ---
+function saveData(){
+  localStorage.setItem('points', points);
+  localStorage.setItem('unlockedLevels', JSON.stringify(unlockedLevels));
+  localStorage.setItem('purchasedThemes', JSON.stringify(purchasedThemes));
+  pointsDisplay.textContent = `Points: ${points}`;
+}
+
+// --- Game Functions ---
 function resetLevel(){
   player.x=50; player.y=200;
   obstacles = JSON.parse(JSON.stringify(levels[currentLevel]));
 }
 
 function resetGame(){
-  currentLevel=0;
   resetLevel();
+  createLevelButtons();
 }
 
 function startGame(){
   resetLevel();
+  gamePointsDisplay.textContent = `Points Earned: 0`;
   loop();
 }
 
@@ -85,6 +165,7 @@ function update(){
   if(keys['ArrowDown']||keys['s']) player.y += player.speed;
   if(keys['ArrowLeft']||keys['a']) player.x -= player.speed;
   if(keys['ArrowRight']||keys['d']) player.x += player.speed;
+
   player.y = Math.max(player.r, Math.min(canvas.height-player.r, player.y));
   player.x = Math.max(player.r, Math.min(canvas.width-player.r, player.x));
 
@@ -104,10 +185,17 @@ function update(){
     if(Math.sqrt(distX*distX + distY*distY)<player.r){ resetLevel(); }
   }
 
-  if(player.x + player.r >= canvas.width){
-    currentLevel++;
-    if(currentLevel >= levels.length) currentLevel=0;
+  // level complete
+  if(player.x+player.r >= canvas.width){
+    const earnedPoints = 10; // flat 10 pts per level
+    points += earnedPoints;
+    gamePointsDisplay.textContent = `Points Earned: ${earnedPoints}`;
+    if(!unlockedLevels.includes(currentLevel+2)) unlockedLevels.push(currentLevel+2);
+    saveData();
+    createLevelButtons();
+    createSettings();
     resetLevel();
+    showScreen(levelScreen);
   }
 }
 
@@ -131,3 +219,6 @@ function loop(){
     requestAnimationFrame(loop);
   }
 }
+
+// --- Initialize Points Display ---
+pointsDisplay.textContent = `Points: ${points}`;
